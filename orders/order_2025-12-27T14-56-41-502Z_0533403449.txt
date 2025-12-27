@@ -1,0 +1,10 @@
+ORDER DETAILS
+-------------
+Date: 27.12.2025, 16:56:41
+Client Name: דניאל
+Client Phone: 0533403449
+Requested Date: 2026-01-21 (2026 год)
+Requested Time: 15:00
+Duration: 1 hours
+
+Status: Pending Operator Confirmation
