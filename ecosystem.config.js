@@ -11,7 +11,7 @@ module.exports = {
     script: "answer_phone.js",
     watch: true,
     cwd: "./",
-    ignore_watch: ["node_modules", "orders", "data", "logs"],
+    ignore_watch: ["node_modules", "orders", "data", "logs", ".git"],
     env: {
       NODE_ENV: "production",
     }

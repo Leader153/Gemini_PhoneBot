@@ -1,27 +1,37 @@
-/**
- * Скрипт загрузки документов в ChromaDB
- * Поддержка всех форматов: PDF, DOCX, TXT, MD
- * Поддержка иврита и многоязычности
- * 
- * ИСПРАВЛЕНИЕ: Теперь скрипт удаляет старую коллекцию перед загрузкой новых документов
- */
-
+const fs = require('fs');
 const path = require('path');
-const { loadDocumentsFromFolder } = require('./rag/documentLoader');
 const { Chroma } = require('@langchain/community/vectorstores/chroma');
 const { embeddings } = require('./rag/embeddings');
 const { COLLECTION_NAME } = require('./rag/vectorStore');
 const { ChromaClient } = require('chromadb');
+const { Document } = require("langchain/document");
 
-// Путь к папке с документами
-const DATA_FOLDER = path.join(__dirname, 'data');
+// Путь к файлу базы знаний
+const CSV_PATH = path.join(__dirname, 'data', 'products_knowledge_base.csv');
 const CHROMA_URL = 'http://localhost:8000';
 
+// Простая функция для парсинга CSV, устойчивая к запятым в кавычках
+function parseCSV(csv) {
+    const lines = csv.trim().split('\n');
+    const headers = lines.shift().split(',');
+    return lines.map(line => {
+        const values = line.match(/(".*?"|[^",]+)(?=\s*,|\s*$)/g) || [];
+        return headers.reduce((obj, header, i) => {
+            let value = (values[i] || '').trim();
+            if (value.startsWith('"') && value.endsWith('"')) {
+                value = value.slice(1, -1).replace(/""/g, '"');
+            }
+            obj[header.trim()] = value;
+            return obj;
+        }, {});
+    });
+}
+
+
 async function main() {
-    console.log('🚀 Начало загрузки документов в ChromaDB...\n');
+    console.log('🚀 Начало загрузки документов в ChromaDB из CSV...\n');
 
     try {
-
         // 0. Подключение к ChromaDB и удаление старой коллекции
         console.log('🔄 Подключение к ChromaDB...');
         const chromaClient = new ChromaClient({ host: CHROMA_URL });
@@ -31,45 +41,68 @@ async function main() {
             await chromaClient.deleteCollection({ name: COLLECTION_NAME });
             console.log('✅ Старая коллекция удалена\n');
         } catch (error) {
-            // Если коллекция не существует, это нормально
             console.log('ℹ️  Коллекция не существует, создаем новую\n');
         }
         
-
-        // 1. Загрузить все документы из папки data/
-        console.log(`📁 Сканирование папки: ${DATA_FOLDER}`);
-        const docs = await loadDocumentsFromFolder(DATA_FOLDER);
-
-        if (docs.length === 0) {
-            console.log('\n⚠️ Документы не найдены в папке data/');
-            console.log('💡 Поместите файлы (PDF, DOCX, TXT, MD) в папку data/ и запустите скрипт снова.');
+        // 1. Загрузить данные из CSV
+        console.log(`📁 Чтение файла: ${CSV_PATH}`);
+        if (!fs.existsSync(CSV_PATH)) {
+            throw new Error(`Файл ${CSV_PATH} не найден!`);
+        }
+        const csvData = fs.readFileSync(CSV_PATH, 'utf-8');
+        const parsedData = parseCSV(csvData);
+        
+        if (parsedData.length === 0) {
+            console.log('\n⚠️ CSV файл пуст или не удалось его распарсить.');
             return;
         }
 
-        console.log(`\n✅ Загружено ${docs.length} чанков из документов`);
+        // 2. Создать документы LangChain с метаданными
+        const docs = parsedData.map(row => {
+            const pageContent = `
+                Название продукта: ${row.Product_Name || ''}
+                Модель: ${row.Model_Type || ''}
+                Цена: ${row.Price || ''}
+                Ключевые особенности: ${row.Key_Features || ''}
+                Целевая аудитория: ${row.Target_Audience || ''}
+            `.trim();
+            
+            const metadata = {
+                id: row.id,
+                Domain: row.Domain,
+                Sub_Category: row.Sub_Category,
+                Product_Name: row.Product_Name,
+                // Добавляем все остальные колонки как метаданные
+                ...row
+            };
+            return new Document({ pageContent, metadata });
+        });
 
-        // 2. Подключиться к хранилищу и добавить документы
+        console.log(`\n✅ Подготовлено ${docs.length} документов из CSV`);
+
+        // 3. Подключиться к хранилищу и добавить документы
         console.log(`\n🔄 Добавление документов в ChromaDB...`);
         console.log(`   Коллекция: ${COLLECTION_NAME}`);
         console.log(`   URL: ${CHROMA_URL}`);
 
-        const { getVectorStore } = require('./rag/vectorStore');
-        const vectorStore = await getVectorStore();
-
-        await vectorStore.addDocuments(docs);
+        // Инициализируем Chroma напрямую для создания коллекции
+        await Chroma.fromDocuments(docs, embeddings, {
+            collectionName: COLLECTION_NAME,
+            url: CHROMA_URL,
+        });
 
         console.log('\n✅ Все документы успешно загружены в ChromaDB!');
         console.log(`📊 Статистика:`);
-        console.log(`   - Всего чанков: ${docs.length}`);
+        console.log(`   - Всего документов: ${docs.length}`);
         console.log(`   - Коллекция: ${COLLECTION_NAME}`);
         console.log(`   - Готово к использованию в RAG!`);
-        console.log('\n💡 Теперь вы можете запустить голосовой бот: node answer_phone.js');
+        console.log('\n💡 Теперь вы можете запустить голосовой бот, который будет различать домены: node answer_phone.js');
 
     } catch (error) {
         console.error('\n❌ Ошибка загрузки документов:', error.message);
         console.error('\n💡 Убедитесь, что:');
         console.error('   1. ChromaDB запущен (docker ps)');
-        console.error('   2. Файлы находятся в папке data/');
+        console.error(`   2. Файл ${CSV_PATH} существует и корректен.`);
         console.error('   3. GEMINI_API_KEY установлен в .env');
         console.error('\n🔧 Полная ошибка:', error);
         process.exit(1);

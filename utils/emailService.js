@@ -23,12 +23,24 @@ async function sendOrderEmail(orderDetails) {
         return false;
     }
 
+    // Собираем дополнительные данные, если они есть
+    let extraDetailsText = '';
+    if (orderDetails.has_terminal) extraDetailsText += `Наличие терминала: ${orderDetails.has_terminal}\n`;
+    if (orderDetails.business_type) extraDetailsText += `Тип бизнеса: ${orderDetails.business_type}\n`;
+    if (orderDetails.city) extraDetailsText += `Город: ${orderDetails.city}\n`;
+
+    let extraDetailsHtml = '';
+    if (orderDetails.has_terminal) extraDetailsHtml += `<p><strong>Наличие терминала:</strong> ${orderDetails.has_terminal}</p>`;
+    if (orderDetails.business_type) extraDetailsHtml += `<p><strong>Тип бизнеса:</strong> ${orderDetails.business_type}</p>`;
+    if (orderDetails.city) extraDetailsHtml += `<p><strong>Город:</strong> ${orderDetails.city}</p>`;
+
+
     const mailOptions = {
         from: `"Gemini Voice Bot" <${process.env.EMAIL_USER}>`,
         to: process.env.EMAIL_TO,
-        subject: `Новый заказ яхты от ${orderDetails.clientName} ⛵`,
+        subject: `Новая заявка от ${orderDetails.clientName}`,
         text: `
-НОВЫЙ ЗАКАЗ ЯХТЫ JOY-BE
+НОВАЯ ЗАЯВКА (Заказ/Встреча)
 -----------------------
 Имя клиента: ${orderDetails.clientName}
 Телефон: ${orderDetails.clientPhone}
@@ -36,20 +48,27 @@ async function sendOrderEmail(orderDetails) {
 Желаемое время: ${orderDetails.time || 'Не указано'}
 Длительность: ${orderDetails.duration} ч.
 
-Статус: Требуется подтверждение оператора.
+--- Дополнительные данные ---
+${extraDetailsText}
+-----------------------
+
+Статус: ${orderDetails.status || 'Требуется подтверждение оператора.'}
         `,
         html: `
             <div style="font-family: Arial, sans-serif; border: 1px solid #ddd; padding: 20px; border-radius: 10px; max-width: 600px;">
-                <h2 style="color: #2c3e50;">🚢 Новый заказ яхты Joy-BE</h2>
+                <h2 style="color: #2c3e50;">📠 Новая заявка (Заказ/Встреча)</h2>
                 <hr>
                 <p><strong>Имя клиента:</strong> ${orderDetails.clientName}</p>
                 <p><strong>Телефон:</strong> <a href="tel:${orderDetails.clientPhone}">${orderDetails.clientPhone}</a></p>
                 <p><strong>Дата:</strong> ${orderDetails.date}</p>
                 <p><strong>Время:</strong> ${orderDetails.time || 'Не указано'}</p>
                 <p><strong>Длительность:</strong> ${orderDetails.duration} ч.</p>
+                <hr>
+                <h3 style="color: #34495e;">Дополнительные данные</h3>
+                ${extraDetailsHtml}
                 <br>
                 <div style="background-color: #f9f9f9; padding: 10px; border-left: 5px solid #3498db;">
-                    <strong>Статус:</strong> Ожидает подтверждения оператора
+                    <strong>Статус:</strong> ${orderDetails.status || 'Ожидает подтверждения оператора'}
                 </div>
                 <p style="font-size: 12px; color: #7f8c8d; margin-top: 20px;">
                     Это автоматическое сообщение от вашего голосового помощника Gemini.

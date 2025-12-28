@@ -1,6 +1,8 @@
 const { checkAvailability, createBooking } = require('./calendarService');
 const { saveOrderToFile } = require('../utils/fileUtils');
 const { sendOrderEmail } = require('../utils/emailService');
+const { saveClientData } = require('../utils/crmService');
+
 
 /**
  * Определение инструментов для Gemini Function Calling
@@ -56,6 +58,18 @@ const calendarTools = [
                     type: 'string',
                     description: 'Email клиента (опционально)',
                 },
+                 has_terminal: {
+                    type: 'string',
+                    description: 'Ответ на вопрос "У вас уже есть терминал?" (да/нет)',
+                },
+                business_type: {
+                    type: 'string',
+                    description: 'Ответ на вопрос "Для какого бизнеса вы ищете решение?"',
+                },
+                city: {
+                    type: 'string',
+                    description: 'Ответ на вопрос "В каком городе вы находитесь?"',
+                },
             },
             required: ['startDateTime', 'endDateTime', 'clientName', 'clientPhone', 'duration'],
         },
@@ -85,7 +99,19 @@ const calendarTools = [
                 duration: {
                     type: 'string',
                     description: 'Длительность в часах',
-                }
+                },
+                has_terminal: {
+                    type: 'string',
+                    description: 'Ответ на вопрос "У вас уже есть терминал?" (да/нет)',
+                },
+                business_type: {
+                    type: 'string',
+                    description: 'Ответ на вопрос "Для какого бизнеса вы ищете решение?"',
+                },
+                city: {
+                    type: 'string',
+                    description: 'Ответ на вопрос "В каком городе вы находитесь?"',
+                },
             },
             required: ['clientName', 'clientPhone', 'date'],
         },
@@ -98,6 +124,36 @@ const calendarTools = [
             properties: {},
         },
     },
+    {
+        name: 'save_client_data',
+        description: 'Сохраняет данные о клиенте (имя, телефон, наличие терминала, тип бизнеса, город) в CRM систему. Использовать после того, как удалось собрать информацию по ходу диалога.',
+        parameters: {
+            type: 'object',
+            properties: {
+                name: {
+                    type: 'string',
+                    description: 'Имя и фамилия клиента',
+                },
+                phone: {
+                    type: 'string',
+                    description: 'Номер телефона клиента',
+                },
+                has_terminal: {
+                    type: 'string',
+                    description: 'Ответ на вопрос "У вас уже есть терминал?" (да/нет)',
+                },
+                business_type: {
+                    type: 'string',
+                    description: 'Ответ на вопрос "Для какого бизнеса вы ищете решение?"',
+                },
+                city: {
+                    type: 'string',
+                    description: 'Ответ на вопрос "В каком городе вы находитесь?"',
+                },
+            },
+            required: ['name', 'phone'],
+        },
+    }
 ];
 
 /**
@@ -145,7 +201,7 @@ async function handleFunctionCall(functionName, args) {
             }
 
             case 'book_yacht': {
-                let { startDateTime, endDateTime, clientName, clientPhone, duration, clientEmail } = args;
+                let { startDateTime, endDateTime, clientName, clientPhone, duration, clientEmail, has_terminal, business_type, city } = args;
                 startDateTime = forceYear2026(startDateTime);
                 endDateTime = forceYear2026(endDateTime);
 
@@ -157,6 +213,9 @@ async function handleFunctionCall(functionName, args) {
                     phone: clientPhone,
                     duration: durationNum,
                     email: clientEmail,
+                    has_terminal: has_terminal,
+                    business_type: business_type,
+                    city: city,
                 };
 
                 // 1. Создаем событие в Google Calendar (теперь права есть)
@@ -169,7 +228,10 @@ async function handleFunctionCall(functionName, args) {
                     clientPhone: clientPhone,
                     date: startDateTime.split('T')[0], // Extract date from ISO string
                     time: startDateTime.split('T')[1].substring(0, 5), // Extract time HH:MM
-                    duration: durationNum
+                    duration: durationNum,
+                    has_terminal: has_terminal,
+                    business_type: business_type,
+                    city: city,
                 };
 
                 const filePath = await saveOrderToFile(orderDetails);
@@ -202,7 +264,7 @@ async function handleFunctionCall(functionName, args) {
             }
 
             case 'send_order_to_operator': {
-                let { clientName, clientPhone, date, time, duration } = args;
+                let { clientName, clientPhone, date, time, duration, has_terminal, business_type, city } = args;
                 date = forceYear2026(date);
 
                 const orderDetails = {
@@ -210,7 +272,10 @@ async function handleFunctionCall(functionName, args) {
                     clientPhone,
                     date,
                     time,
-                    duration
+                    duration,
+                    has_terminal, 
+                    business_type, 
+                    city
                 };
 
                 const filePath = await saveOrderToFile(orderDetails);
@@ -233,6 +298,10 @@ async function handleFunctionCall(functionName, args) {
                     shouldTransfer: true,
                     message: 'Перевод звонка на оператора инициирован.',
                 };
+            }
+            
+            case 'save_client_data': {
+                return await saveClientData(args);
             }
 
             default:

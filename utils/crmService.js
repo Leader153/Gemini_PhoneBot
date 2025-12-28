@@ -1,3 +1,6 @@
+const fs = require('fs');
+const path = require('path');
+
 /**
  * Имитация сервиса CRM для получения данных о клиентах.
  */
@@ -33,6 +36,40 @@ function getCustomerData(phone) {
     return null;
 }
 
+/**
+ * Сохраняет данные клиента в текстовый файл.
+ * @param {object} clientData - Данные клиента.
+ * @param {string} [clientData.name] - Имя и фамилия клиента.
+ * @param {string} [clientData.phone] - Номер телефона.
+ * @param {string} [clientData.has_terminal] - Есть ли терминал?
+ * @param {string} [clientData.business_type] - Тип бизнеса.
+ * @param {string} [clientData.city] - Город.
+ */
+function saveClientData(clientData) {
+    const txtPath = path.join(__dirname, '..', 'data', 'clientData.txt');
+    const now = new Date().toLocaleString('ru-RU', { timeZone: 'Asia/Jerusalem' });
+
+    // Формируем читаемую строку
+    let content = `Дата и время: ${now}\n`;
+    content += `Имя и фамилия: ${clientData.name || ''}\n`;
+    content += `Номер телефона: ${clientData.phone || ''}\n`;
+    content += `Есть ли терминал: ${clientData.has_terminal || ''}\n`;
+    content += `Тип бизнеса: ${clientData.business_type || ''}\n`;
+    content += `Город: ${clientData.city || ''}\n`;
+    content += '----------------------------------------\n';
+
+    try {
+        fs.appendFileSync(txtPath, content, 'utf-8');
+        console.log(`✅ CRM: Данные клиента сохранены в ${txtPath}`);
+        return { status: "success", message: "Данные клиента успешно сохранены." };
+    } catch (error) {
+        console.error(`❌ CRM: Ошибка сохранения данных клиента:`, error);
+        return { status: "error", message: "Ошибка при сохранении данных клиента." };
+    }
+}
+
+
 module.exports = {
-    getCustomerData
+    getCustomerData,
+    saveClientData
 };
