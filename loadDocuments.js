@@ -4,7 +4,7 @@ const { Chroma } = require('@langchain/community/vectorstores/chroma');
 const { embeddings } = require('./rag/embeddings');
 const { COLLECTION_NAME } = require('./rag/vectorStore');
 const { ChromaClient } = require('chromadb');
-const { Document } = require("langchain/document");
+const { Document } = require("@langchain/core/documents");
 
 // Путь к файлу базы знаний
 const CSV_PATH = path.join(__dirname, 'data', 'products_knowledge_base.csv');
@@ -15,7 +15,8 @@ function parseCSV(csv) {
     const lines = csv.trim().split('\n');
     const headers = lines.shift().split(',');
     return lines.map(line => {
-        const values = line.match(/(".*?"|[^",]+)(?=\s*,|\s*$)/g) || [];
+        // Регулярное выражение для корректного разделения CSV с учетом кавычек
+        const values = line.match(/(".*?"|[^",\r\n]+)(?=\s*,|\s*$|\s*\r|\s*\n)/g) || [];
         return headers.reduce((obj, header, i) => {
             let value = (values[i] || '').trim();
             if (value.startsWith('"') && value.endsWith('"')) {
@@ -34,7 +35,7 @@ async function main() {
     try {
         // 0. Подключение к ChromaDB и удаление старой коллекции
         console.log('🔄 Подключение к ChromaDB...');
-        const chromaClient = new ChromaClient({ host: CHROMA_URL });
+        const chromaClient = new ChromaClient({ path: CHROMA_URL });
 
         try {
             console.log(`🗑️  Удаление старой коллекции "${COLLECTION_NAME}"...`);
@@ -43,7 +44,7 @@ async function main() {
         } catch (error) {
             console.log('ℹ️  Коллекция не существует, создаем новую\n');
         }
-        
+
         // 1. Загрузить данные из CSV
         console.log(`📁 Чтение файла: ${CSV_PATH}`);
         if (!fs.existsSync(CSV_PATH)) {
@@ -51,7 +52,7 @@ async function main() {
         }
         const csvData = fs.readFileSync(CSV_PATH, 'utf-8');
         const parsedData = parseCSV(csvData);
-        
+
         if (parsedData.length === 0) {
             console.log('\n⚠️ CSV файл пуст или не удалось его распарсить.');
             return;
@@ -66,7 +67,7 @@ async function main() {
                 Ключевые особенности: ${row.Key_Features || ''}
                 Целевая аудитория: ${row.Target_Audience || ''}
             `.trim();
-            
+
             const metadata = {
                 id: row.id,
                 Domain: row.Domain,

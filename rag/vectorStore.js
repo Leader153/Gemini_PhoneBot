@@ -26,7 +26,7 @@ async function getVectorStore() {
             embeddings,
             {
                 collectionName: COLLECTION_NAME,
-                host: CHROMA_URL,
+                url: CHROMA_URL,
             }
         );
         console.log(`✅ Подключено к ChromaDB коллекции: ${COLLECTION_NAME}`);
@@ -35,7 +35,7 @@ async function getVectorStore() {
         console.log(`⚠️ Коллекция не найдена, создаём новую: ${COLLECTION_NAME}`);
         cachedVectorStore = new Chroma(embeddings, {
             collectionName: COLLECTION_NAME,
-            host: CHROMA_URL,
+            url: CHROMA_URL,
         });
         return cachedVectorStore;
     }

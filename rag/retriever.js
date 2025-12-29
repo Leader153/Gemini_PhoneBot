@@ -46,9 +46,7 @@ async function retrieveContext(query, k = 3) {
         let filter = {};
         if (domain) {
             filter = {
-                where: {
-                    "Domain": domain
-                }
+                "Domain": domain
             };
         }
 
