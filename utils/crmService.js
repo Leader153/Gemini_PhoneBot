@@ -56,6 +56,10 @@ function saveClientData(clientData) {
     content += `Есть ли терминал: ${clientData.has_terminal || ''}\n`;
     content += `Тип бизнеса: ${clientData.business_type || ''}\n`;
     content += `Город: ${clientData.city || ''}\n`;
+    content += `Месячный оборот: ${clientData.monthly_turnover || ''}\n`;
+    content += `Текущий провайдер: ${clientData.current_provider || ''}\n`;
+    content += `Кол-во касс: ${clientData.points_count || ''}\n`;
+    content += `Срочность: ${clientData.urgency || ''}\n`;
     content += '----------------------------------------\n';
 
     try {

@@ -58,7 +58,7 @@ const calendarTools = [
                     type: 'string',
                     description: 'Email клиента (опционально)',
                 },
-                 has_terminal: {
+                has_terminal: {
                     type: 'string',
                     description: 'Ответ на вопрос "У вас уже есть терминал?" (да/нет)',
                 },
@@ -69,6 +69,22 @@ const calendarTools = [
                 city: {
                     type: 'string',
                     description: 'Ответ на вопрос "В каком городе вы находитесь?"',
+                },
+                monthly_turnover: {
+                    type: 'string',
+                    description: 'Примерный месячный оборот по картам',
+                },
+                current_provider: {
+                    type: 'string',
+                    description: 'Текущий провайдер эквайринга/терминала',
+                },
+                points_count: {
+                    type: 'string',
+                    description: 'Количество необходимых кассовых точек',
+                },
+                urgency: {
+                    type: 'string',
+                    description: 'Как срочно требуется установка',
                 },
             },
             required: ['startDateTime', 'endDateTime', 'clientName', 'clientPhone', 'duration'],
@@ -112,6 +128,22 @@ const calendarTools = [
                     type: 'string',
                     description: 'Ответ на вопрос "В каком городе вы находитесь?"',
                 },
+                monthly_turnover: {
+                    type: 'string',
+                    description: 'Примерный месячный оборот по картам',
+                },
+                current_provider: {
+                    type: 'string',
+                    description: 'Текущий провайдер эквайринга/терминала',
+                },
+                points_count: {
+                    type: 'string',
+                    description: 'Количество необходимых кассовых точек',
+                },
+                urgency: {
+                    type: 'string',
+                    description: 'Как срочно требуется установка',
+                },
             },
             required: ['clientName', 'clientPhone', 'date'],
         },
@@ -149,6 +181,22 @@ const calendarTools = [
                 city: {
                     type: 'string',
                     description: 'Ответ на вопрос "В каком городе вы находитесь?"',
+                },
+                monthly_turnover: {
+                    type: 'string',
+                    description: 'Примерный месячный оборот по картам',
+                },
+                current_provider: {
+                    type: 'string',
+                    description: 'Текущий провайдер эквайринга/терминала',
+                },
+                points_count: {
+                    type: 'string',
+                    description: 'Количество необходимых кассовых точек',
+                },
+                urgency: {
+                    type: 'string',
+                    description: 'Как срочно требуется установка',
                 },
             },
             required: ['name', 'phone'],
@@ -201,7 +249,7 @@ async function handleFunctionCall(functionName, args) {
             }
 
             case 'book_yacht': {
-                let { startDateTime, endDateTime, clientName, clientPhone, duration, clientEmail, has_terminal, business_type, city } = args;
+                let { startDateTime, endDateTime, clientName, clientPhone, duration, clientEmail, has_terminal, business_type, city, monthly_turnover, current_provider, points_count, urgency } = args;
                 startDateTime = forceYear2026(startDateTime);
                 endDateTime = forceYear2026(endDateTime);
 
@@ -216,22 +264,30 @@ async function handleFunctionCall(functionName, args) {
                     has_terminal: has_terminal,
                     business_type: business_type,
                     city: city,
+                    monthly_turnover: monthly_turnover,
+                    current_provider: current_provider,
+                    points_count: points_count,
+                    urgency: urgency,
                 };
 
-                // 1. Создаем событие в Google Calendar (теперь права есть)
+                // 1. Создаем событие в Google Calendar
                 console.log('📅 Попытка создания события в Google Calendar...');
                 const booking = await createBooking(startDateTime, endDateTime, clientInfo);
 
-                // 2. Также сохраняем заказ в локальный файл (как резервная копия)
+                // 2. Также сохраняем заказ в локальный файл
                 const orderDetails = {
                     clientName: clientName,
                     clientPhone: clientPhone,
-                    date: startDateTime.split('T')[0], // Extract date from ISO string
-                    time: startDateTime.split('T')[1].substring(0, 5), // Extract time HH:MM
+                    date: startDateTime.split('T')[0],
+                    time: startDateTime.split('T')[1].substring(0, 5),
                     duration: durationNum,
                     has_terminal: has_terminal,
                     business_type: business_type,
                     city: city,
+                    monthly_turnover: monthly_turnover,
+                    current_provider: current_provider,
+                    points_count: points_count,
+                    urgency: urgency,
                 };
 
                 const filePath = await saveOrderToFile(orderDetails);
@@ -243,9 +299,6 @@ async function handleFunctionCall(functionName, args) {
                     status: 'Confirmed in Calendar'
                 });
 
-                // Цена для Nova 55 F (заглушка, можно расширить для других товаров)
-                const price = "2750 шекелей + НДС";
-
                 return {
                     success: true,
                     message: `Встреча для демонстрации успешно назначена в Google Calendar (Ссылка: ${booking.htmlLink}) И сохранена в файл (${filePath}). ОБЯЗАТЕЛЬНО скажи клиенту: "Я записала вас на демонстрацию товара на ${orderDetails.date} в ${orderDetails.time}. Мы находимся в офисе компании Leader. Будем рады вас видеть!"`,
@@ -256,7 +309,6 @@ async function handleFunctionCall(functionName, args) {
                         end: booking.end.dateTime,
                         client: clientName,
                         phone: clientPhone,
-                        price: price,
                         link: booking.htmlLink,
                         localFile: filePath
                     },
@@ -264,7 +316,7 @@ async function handleFunctionCall(functionName, args) {
             }
 
             case 'send_order_to_operator': {
-                let { clientName, clientPhone, date, time, duration, has_terminal, business_type, city } = args;
+                let { clientName, clientPhone, date, time, duration, has_terminal, business_type, city, monthly_turnover, current_provider, points_count, urgency } = args;
                 date = forceYear2026(date);
 
                 const orderDetails = {
@@ -273,9 +325,13 @@ async function handleFunctionCall(functionName, args) {
                     date,
                     time,
                     duration,
-                    has_terminal, 
-                    business_type, 
-                    city
+                    has_terminal,
+                    business_type,
+                    city,
+                    monthly_turnover,
+                    current_provider,
+                    points_count,
+                    urgency
                 };
 
                 const filePath = await saveOrderToFile(orderDetails);
@@ -291,15 +347,13 @@ async function handleFunctionCall(functionName, args) {
             }
 
             case 'transfer_to_support': {
-                // Эта функция обрабатывается специально в answer_phone.js для генерации TwiML <Dial>
-                // Здесь мы просто возвращаем успешный статус, чтобы логика не ломалась
                 return {
                     success: true,
                     shouldTransfer: true,
                     message: 'Перевод звонка на оператора инициирован.',
                 };
             }
-            
+
             case 'save_client_data': {
                 return await saveClientData(args);
             }
