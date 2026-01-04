@@ -43,23 +43,30 @@ async function retrieveContext(query, k = 3) {
         const vectorStore = await getVectorStore();
         const domain = inferDomain(query);
 
-        let filter = {};
+        let filter = undefined;
         if (domain) {
             filter = {
                 "Domain": domain
             };
         }
 
-        // Семантический поиск по запросу с фильтром
-        const results = await vectorStore.similaritySearch(query, k, filter);
+        console.log(`[RAG_DEBUG] Searching for: "${query}" (Domain: ${domain || 'ALL'})`);
 
-        if (results.length === 0) {
-            console.log('⚠️ Релевантные документы не найдены (с учетом фильтра)');
+        // Поиск с оценкой релевантности
+        const resultsWithScore = await vectorStore.similaritySearchWithScore(query, k, filter);
+
+        if (resultsWithScore.length === 0) {
+            console.log('[RAG_DEBUG] ⚠️ No documents found');
             return [];
         }
 
-        console.log(`✅ Найдено ${results.length} релевантных документов`);
-        return results;
+        console.log(`[RAG_DEBUG] ✅ Found ${resultsWithScore.length} documents:`);
+        resultsWithScore.forEach(([doc, score], i) => {
+            console.log(`  ${i + 1}. [Score: ${score.toFixed(4)}] ${doc.pageContent.substring(0, 100)}...`);
+        });
+
+        // Возвращаем только документы
+        return resultsWithScore.map(([doc, score]) => doc);
 
     } catch (error) {
         console.error('❌ Ошибка поиска документов:', error.message);

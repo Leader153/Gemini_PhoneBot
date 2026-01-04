@@ -10,19 +10,35 @@ const { Document } = require("@langchain/core/documents");
 const CSV_PATH = path.join(__dirname, 'data', 'products_knowledge_base.csv');
 const CHROMA_URL = 'http://localhost:8000';
 
-// Простая функция для парсинга CSV, устойчивая к запятым в кавычках
+// Простая функция для парсинга CSV, устойчивая к запятым в кавычках и пустым полям
 function parseCSV(csv) {
     const lines = csv.trim().split('\n');
-    const headers = lines.shift().split(',');
+    const headers = lines.shift().split(',').map(h => h.trim());
+
     return lines.map(line => {
-        // Регулярное выражение для корректного разделения CSV с учетом кавычек
-        const values = line.match(/(".*?"|[^",\r\n]+)(?=\s*,|\s*$|\s*\r|\s*\n)/g) || [];
+        const values = [];
+        let current = '';
+        let inQuotes = false;
+
+        for (let i = 0; i < line.length; i++) {
+            const char = line[i];
+            if (char === '"') {
+                inQuotes = !inQuotes;
+            } else if (char === ',' && !inQuotes) {
+                values.push(current.trim());
+                current = '';
+            } else {
+                current += char;
+            }
+        }
+        values.push(current.trim()); // Добавляем последнее значение
+
         return headers.reduce((obj, header, i) => {
-            let value = (values[i] || '').trim();
+            let value = values[i] || '';
             if (value.startsWith('"') && value.endsWith('"')) {
                 value = value.slice(1, -1).replace(/""/g, '"');
             }
-            obj[header.trim()] = value;
+            obj[header] = value;
             return obj;
         }, {});
     });
@@ -61,25 +77,25 @@ async function main() {
         // 2. Создать документы LangChain с метаданными
         const docs = parsedData.map(row => {
             const pageContent = `
-                Название продукта: ${row.Product_Name || ''}
-                Модель: ${row.Model_Type || ''}
-                Цена: ${row.Price || ''}
-                Ключевые особенности: ${row.Key_Features || ''}
-                Целевая аудитория: ${row.Target_Audience || ''}
+Product: ${row.Product_Name || ''}
+Model: ${row.Model_Type || ''}
+Price: ${row.Price || ''}
+Features: ${row.Key_Features || ''}
+Connectivity & Safety: ${row.Connectivity_Safety || ''}
+Target: ${row.Target_Audience || ''}
+Category: ${row.Domain || ''} / ${row.Sub_Category || ''}
             `.trim();
 
-            const metadata = {
-                id: row.id,
-                Domain: row.Domain,
-                Sub_Category: row.Sub_Category,
-                Product_Name: row.Product_Name,
-                // Добавляем все остальные колонки как метаданные
-                ...row
-            };
-            return new Document({ pageContent, metadata });
+            return new Document({
+                pageContent,
+                metadata: { ...row }
+            });
         });
 
         console.log(`\n✅ Подготовлено ${docs.length} документов из CSV`);
+        if (docs.length > 0) {
+            console.log('📝 Пример первого документа:\n', docs[0].pageContent);
+        }
 
         // 3. Подключиться к хранилищу и добавить документы
         console.log(`\n🔄 Добавление документов в ChromaDB...`);
