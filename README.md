@@ -1,3 +1,4 @@
+gemini_salesAgent
 //node tmp_chroma_query.js
 //проверка того что есть в хромаДБ
 проверь что chromadb включен
